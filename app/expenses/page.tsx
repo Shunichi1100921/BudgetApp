@@ -110,7 +110,6 @@ export default function ExpensesPage() {
       date: editingValues.date ?? expense.date,
     });
     
-    alert("支出を更新しました");
     handleCancelEdit();
   };
 

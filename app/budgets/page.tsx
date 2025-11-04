@@ -82,7 +82,11 @@ export default function BudgetsPage() {
     format(new Date(), "yyyy-MM")
   );
   const [editingBalanceId, setEditingBalanceId] = useState<string | null>(null);
-  const [budgetAmounts, setBudgetAmounts] = useState<Partial<Record<ExpenseCategory, number>>>({});
+  const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
+  const [isAddingBudget, setIsAddingBudget] = useState(false);
+  const [newBudgetCategory, setNewBudgetCategory] = useState<ExpenseCategory | "">("");
+  const [newBudgetAmount, setNewBudgetAmount] = useState<number>(0);
+  const [editingBudgetAmount, setEditingBudgetAmount] = useState<number>(0);
 
   useEffect(() => {
     initialize();
@@ -145,52 +149,91 @@ export default function BudgetsPage() {
 
   // ステップ2: 予算分配の処理
   const totalBalance = getTotalBalance();
-  const totalAllocated = Object.values(budgetAmounts).reduce(
-    (sum, amount) => sum + (amount || 0),
+  const filteredBudgets = budgets.filter((b) => b.month === selectedMonth);
+  const totalAllocated = filteredBudgets.reduce(
+    (sum, budget) => sum + budget.amount,
     0
   );
   const remainingForSavings = totalBalance - totalAllocated;
 
-  // 予算分配の保存
-  const handleSaveBudgetAllocation = () => {
-    // 既存の予算を削除
-    const existingBudgets = budgets.filter((b) => b.month === selectedMonth);
-    existingBudgets.forEach((b) => deleteBudget(b.id));
+  // 既に設定されているカテゴリを取得
+  const allocatedCategories = new Set(
+    filteredBudgets.map((b) => b.category)
+  );
 
-    // 新しい予算を追加（貯金以外）
-    Object.entries(budgetAmounts).forEach(([category, amount]) => {
-      if (category !== SAVINGS_CATEGORY && amount && amount > 0) {
-        addBudget({
-          category: category as ExpenseCategory,
-          amount: amount,
-          month: selectedMonth,
-        });
-      }
-    });
+  // 追加可能なカテゴリリスト（貯金を含む全てのカテゴリから既に設定済みのものを除外）
+  const availableCategories = expenseCategories.filter(
+    (category) => !allocatedCategories.has(category)
+  );
 
-    // 貯金カテゴリに残りを設定
-    if (remainingForSavings > 0) {
-      addBudget({
-        category: SAVINGS_CATEGORY,
-        amount: remainingForSavings,
-        month: selectedMonth,
-      });
+  // 予算の追加
+  const handleAddBudget = () => {
+    if (!newBudgetCategory || newBudgetAmount <= 0) {
+      alert("カテゴリと金額を入力してください");
+      return;
     }
 
-    alert("予算の分配を保存しました");
+    if (totalAllocated + newBudgetAmount > totalBalance) {
+      alert("合計所持金を超える予算を設定できません");
+      return;
+    }
+
+    addBudget({
+      category: newBudgetCategory as ExpenseCategory,
+      amount: newBudgetAmount,
+      month: selectedMonth,
+    });
+
+    setNewBudgetCategory("");
+    setNewBudgetAmount(0);
+    setIsAddingBudget(false);
   };
 
-  // 月変更時に予算を読み込む
-  useEffect(() => {
-    const monthBudgets = budgets.filter((b) => b.month === selectedMonth);
-    const amounts: Record<ExpenseCategory, number> = {} as Record<ExpenseCategory, number>;
-    monthBudgets.forEach((budget) => {
-      amounts[budget.category] = budget.amount;
-    });
-    setBudgetAmounts(amounts);
-  }, [selectedMonth, budgets]);
+  // 予算の編集開始
+  const handleStartEditBudget = (budget: Budget) => {
+    setEditingBudgetId(budget.id);
+    setEditingBudgetAmount(budget.amount);
+  };
 
-  const filteredBudgets = budgets.filter((b) => b.month === selectedMonth);
+  // 予算の更新
+  const handleUpdateBudget = (budgetId: string) => {
+    if (editingBudgetAmount <= 0) {
+      alert("金額を入力してください");
+      return;
+    }
+
+    const budget = filteredBudgets.find((b) => b.id === budgetId);
+    if (!budget) return;
+
+    const otherBudgetsTotal = filteredBudgets
+      .filter((b) => b.id !== budgetId)
+      .reduce((sum, b) => sum + b.amount, 0);
+
+    if (otherBudgetsTotal + editingBudgetAmount > totalBalance) {
+      alert("合計所持金を超える予算を設定できません");
+      return;
+    }
+
+    updateBudget(budgetId, {
+      amount: editingBudgetAmount,
+    });
+
+    setEditingBudgetId(null);
+    setEditingBudgetAmount(0);
+  };
+
+  // 予算の編集キャンセル
+  const handleCancelEditBudget = () => {
+    setEditingBudgetId(null);
+    setEditingBudgetAmount(0);
+  };
+
+  // 追加キャンセル
+  const handleCancelAddBudget = () => {
+    setIsAddingBudget(false);
+    setNewBudgetCategory("");
+    setNewBudgetAmount(0);
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -384,200 +427,269 @@ export default function BudgetsPage() {
 
       {/* ステップ2: 予算分配 */}
       {step === 2 && (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>予算の分配</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-600">合計所持金</span>
-                    <span className="text-2xl font-bold text-blue-900">
-                      {formatCurrency(totalBalance)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">分配済み</span>
-                    <span className="font-semibold text-gray-900">
-                      {formatCurrency(totalAllocated)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm mt-2 pt-2 border-t border-blue-300">
-                    <span className="text-gray-900 font-medium">
-                      残り（貯金カテゴリへ自動設定）
-                    </span>
-                    <span
-                      className={`font-bold text-lg ${
-                        remainingForSavings < 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {formatCurrency(remainingForSavings)}
-                    </span>
-                  </div>
+        <div className="relative">
+          {/* 合計金額を右側に固定表示 */}
+          <div className="fixed top-20 right-4 z-10 w-64">
+            <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-lg">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">合計所持金</span>
+                  <span className="text-xl font-bold text-blue-900">
+                    {formatCurrency(totalBalance)}
+                  </span>
                 </div>
-
-                <Input
-                  label="対象月"
-                  type="month"
-                  value={selectedMonth}
-                  onChange={(e) => {
-                    setSelectedMonth(e.target.value);
-                    allocationForm.setValue("month", e.target.value);
-                  }}
-                />
-
-                <div className="space-y-4">
-                  {expenseCategories
-                    .filter((category) => category !== SAVINGS_CATEGORY)
-                    .map((category) => (
-                      <div
-                        key={category}
-                        className="p-4 border border-gray-200 rounded-lg"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="font-medium text-gray-900">
-                            {category}
-                          </label>
-                        </div>
-                        <Input
-                          type="number"
-                          value={budgetAmounts[category] || ""}
-                          onChange={(e) => {
-                            const value = e.target.value
-                              ? Number(e.target.value)
-                              : 0;
-                            setBudgetAmounts((prev) => ({
-                              ...prev,
-                              [category]: value,
-                            }));
-                          }}
-                          placeholder="0"
-                        />
-                      </div>
-                    ))}
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-600">分配済み</span>
+                  <span className="font-semibold text-gray-900">
+                    {formatCurrency(totalAllocated)}
+                  </span>
                 </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setStep(1)}
-                    className="flex-1"
+                <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
+                  <span className="text-gray-900 font-medium text-xs">
+                    残り（貯金へ）
+                  </span>
+                  <span
+                    className={`font-bold ${
+                      remainingForSavings < 0
+                        ? "text-red-600"
+                        : "text-green-600"
+                    }`}
                   >
-                    戻る：所持金入力
-                  </Button>
-                  <Button
-                    onClick={handleSaveBudgetAllocation}
-                    className="flex-1"
-                    disabled={remainingForSavings < 0}
-                  >
-                    予算を保存
-                  </Button>
+                    {formatCurrency(remainingForSavings)}
+                  </span>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* 設定済み予算の表示 */}
-          {filteredBudgets.length > 0 && (
+          <div className="space-y-6 pr-72">
             <Card>
               <CardHeader>
-                <CardTitle>
-                  {format(new Date(selectedMonth + "-01"), "yyyy年M月")}の予算
-                </CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>
+                    {format(new Date(selectedMonth + "-01"), "yyyy年M月")}の予算
+                  </CardTitle>
+                  <Input
+                    type="month"
+                    value={selectedMonth}
+                    onChange={(e) => {
+                      setSelectedMonth(e.target.value);
+                      allocationForm.setValue("month", e.target.value);
+                      setEditingBudgetId(null);
+                      setIsAddingBudget(false);
+                    }}
+                    className="w-40"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredBudgets.map((budget) => {
-                    const spent = getCategoryTotalByMonth(
-                      budget.category,
-                      selectedMonth
-                    );
-                    const remaining = budget.amount - spent;
-                    const percentage = (spent / budget.amount) * 100;
-                    const exceeded = isBudgetExceeded(
-                      budget.category,
-                      selectedMonth
-                    );
+                      const spent = getCategoryTotalByMonth(
+                        budget.category,
+                        selectedMonth
+                      );
+                      const remaining = budget.amount - spent;
+                      const percentage = (spent / budget.amount) * 100;
+                      const exceeded = isBudgetExceeded(
+                        budget.category,
+                        selectedMonth
+                      );
+                      const isEditing = editingBudgetId === budget.id;
 
-                    return (
-                      <div
-                        key={budget.id}
-                        className={`p-4 border rounded-lg ${
-                          exceeded ? "border-red-300 bg-red-50" : "border-gray-200"
-                        }`}
-                      >
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="font-bold text-lg text-gray-900">
-                              {budget.category}
-                            </h3>
-                            <p className="text-sm text-gray-600 mt-1">
-                              予算: {formatCurrency(budget.amount)}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="danger"
-                              onClick={() => deleteBudget(budget.id)}
-                              className="text-sm"
-                            >
-                              削除
-                            </Button>
-                          </div>
+                      return (
+                        <div
+                          key={budget.id}
+                          className={`p-3 border rounded-lg ${
+                            exceeded ? "border-red-300 bg-red-50" : "border-gray-200"
+                          }`}
+                        >
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <div className="font-bold text-sm text-gray-900 mb-2">
+                                {budget.category}
+                              </div>
+                              <Input
+                                type="number"
+                                label="予算額"
+                                value={editingBudgetAmount || ""}
+                                onChange={(e) =>
+                                  setEditingBudgetAmount(
+                                    e.target.value ? Number(e.target.value) : 0
+                                  )
+                                }
+                                className="text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleUpdateBudget(budget.id)}
+                                  className="flex-1 text-xs"
+                                >
+                                  保存
+                                </Button>
+                                <Button
+                                  variant="secondary"
+                                  onClick={handleCancelEditBudget}
+                                  className="flex-1 text-xs"
+                                >
+                                  キャンセル
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <h3 className="font-bold text-sm text-gray-900 truncate">
+                                      {budget.category}
+                                    </h3>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        variant="secondary"
+                                        onClick={() => handleStartEditBudget(budget)}
+                                        className="text-xs px-2 py-1 flex-shrink-0"
+                                      >
+                                        編集
+                                      </Button>
+                                      <Button
+                                        variant="danger"
+                                        onClick={() => deleteBudget(budget.id)}
+                                        className="text-xs px-2 py-1 flex-shrink-0"
+                                      >
+                                        削除
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <p className="text-xs text-gray-600">
+                                    予算: {formatCurrency(budget.amount)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="mb-2">
+                                <div className="flex justify-between text-xs mb-1">
+                                  <span className="text-gray-600">使用額</span>
+                                  <span
+                                    className={`font-semibold ${
+                                      exceeded ? "text-red-600" : "text-gray-900"
+                                    }`}
+                                  >
+                                    {formatCurrency(spent)} ({percentage.toFixed(1)}%)
+                                  </span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className={`h-2 rounded-full transition-all ${
+                                      exceeded
+                                        ? "bg-red-500"
+                                        : percentage > 80
+                                        ? "bg-yellow-500"
+                                        : "bg-blue-500"
+                                    }`}
+                                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">残り</span>
+                                <span
+                                  className={`font-semibold ${
+                                    remaining < 0 ? "text-red-600" : "text-gray-900"
+                                  }`}
+                                >
+                                  {formatCurrency(remaining)}
+                                </span>
+                              </div>
+
+                              {exceeded && (
+                                <div className="mt-2 p-1.5 bg-red-100 border border-red-300 rounded text-xs text-red-800">
+                                  ⚠️ 超過
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
+                      );
+                    })}
 
-                        <div className="mb-2">
-                          <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">使用額</span>
-                            <span
-                              className={`font-semibold ${
-                                exceeded ? "text-red-600" : "text-gray-900"
-                              }`}
-                            >
-                              {formatCurrency(spent)} ({percentage.toFixed(1)}%)
-                            </span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-3">
-                            <div
-                              className={`h-3 rounded-full transition-all ${
-                                exceeded
-                                  ? "bg-red-500"
-                                  : percentage > 80
-                                  ? "bg-yellow-500"
-                                  : "bg-blue-500"
-                              }`}
-                              style={{ width: `${Math.min(percentage, 100)}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">残り</span>
-                          <span
-                            className={`font-semibold ${
-                              remaining < 0 ? "text-red-600" : "text-gray-900"
-                            }`}
+                  {/* 追加カード */}
+                  {isAddingBudget ? (
+                    <div className="p-3 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
+                      <div className="space-y-2">
+                        <Select
+                          label="カテゴリ"
+                          value={newBudgetCategory}
+                          onChange={(e) =>
+                            setNewBudgetCategory(e.target.value as ExpenseCategory)
+                          }
+                        >
+                          <option value="">選択してください</option>
+                          {availableCategories.map((category) => (
+                            <option key={category} value={category}>
+                              {category}
+                            </option>
+                          ))}
+                        </Select>
+                        <Input
+                          type="number"
+                          label="予算額"
+                          value={newBudgetAmount || ""}
+                          onChange={(e) =>
+                            setNewBudgetAmount(
+                              e.target.value ? Number(e.target.value) : 0
+                            )
+                          }
+                          className="text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={handleAddBudget}
+                            className="flex-1 text-xs"
                           >
-                            {formatCurrency(remaining)}
-                          </span>
+                            追加
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            onClick={handleCancelAddBudget}
+                            className="flex-1 text-xs"
+                          >
+                            キャンセル
+                          </Button>
                         </div>
-
-                        {exceeded && (
-                          <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded text-sm text-red-800">
-                            ⚠️ 予算を超過しています
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setIsAddingBudget(true)}
+                      className="p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors text-gray-500 hover:text-blue-600 min-h-[120px] flex items-center justify-center"
+                      disabled={availableCategories.length === 0}
+                    >
+                      <div className="text-center">
+                        <div className="text-2xl font-bold mb-1">+</div>
+                        <div className="text-sm">追加</div>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          )}
+
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setStep(1);
+                  setEditingBudgetId(null);
+                  setIsAddingBudget(false);
+                }}
+                className="flex-1"
+              >
+                戻る：所持金入力
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

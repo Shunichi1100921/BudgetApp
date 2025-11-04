@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useBudgetStore } from "@/lib/store/useBudgetStore";
 import { Expense, ExpenseCategory, PaymentMethod } from "@/lib/types";
 import ExpenseForm from "@/components/ExpenseForm";
@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function ExpensesPage() {
-  const { expenses, initialize, deleteExpense } = useBudgetStore();
+  const { expenses, budgets, initialize, deleteExpense } = useBudgetStore();
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
@@ -46,17 +46,19 @@ export default function ExpensesPage() {
     );
   }, [expenses, filterMonth, filterCategory, filterPaymentMethod]);
 
-  const categories: ExpenseCategory[] = [
-    "食費",
-    "交通費",
-    "娯楽",
-    "衣服",
-    "医療費",
-    "光熱費",
-    "通信費",
-    "貯金",
-    "その他",
-  ];
+  // Get unique categories from budgets and existing expenses
+  const categories = useMemo(() => {
+    const budgetCategories = Array.from(
+      new Set(budgets.map((budget) => budget.category))
+    );
+    const expenseCategories = Array.from(
+      new Set(expenses.map((expense) => expense.category))
+    );
+    const allCategories = Array.from(
+      new Set([...budgetCategories, ...expenseCategories])
+    );
+    return allCategories.sort();
+  }, [budgets, expenses]);
 
   const paymentMethods: PaymentMethod[] = [
     "現金",

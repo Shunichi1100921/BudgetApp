@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -37,18 +38,6 @@ const expenseSchema = z.object({
 
 type ExpenseFormData = z.infer<typeof expenseSchema>;
 
-const categories: ExpenseCategory[] = [
-  "食費",
-  "交通費",
-  "娯楽",
-  "衣服",
-  "医療費",
-  "光熱費",
-  "通信費",
-  "貯金",
-  "その他",
-];
-
 const paymentMethods: PaymentMethod[] = [
   "現金",
   "クレジットカード",
@@ -58,7 +47,15 @@ const paymentMethods: PaymentMethod[] = [
 ];
 
 export default function ExpenseForm() {
-  const { addExpense } = useBudgetStore();
+  const { addExpense, budgets } = useBudgetStore();
+  
+  // Get unique categories from budgets
+  const categories = useMemo(() => {
+    const uniqueCategories = Array.from(
+      new Set(budgets.map((budget) => budget.category))
+    );
+    return uniqueCategories.sort();
+  }, [budgets]);
   const {
     register,
     handleSubmit,
@@ -116,14 +113,24 @@ export default function ExpenseForm() {
             label="カテゴリ"
             {...register("category")}
             error={errors.category?.message}
+            disabled={categories.length === 0}
           >
-            <option value="">選択してください</option>
+            <option value="">
+              {categories.length === 0
+                ? "予算を先に作成してください"
+                : "選択してください"}
+            </option>
             {categories.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>
             ))}
           </Select>
+          {categories.length === 0 && (
+            <p className="text-sm text-amber-600">
+              カテゴリを選択するには、まず予算管理ページで予算を作成してください。
+            </p>
+          )}
 
           <Select
             label="支払い方法"

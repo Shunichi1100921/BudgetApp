@@ -53,16 +53,12 @@ export default function AnalyticsPage() {
 
   // カテゴリ別の支出データ
   const categoryData = (() => {
-    const categories: ExpenseCategory[] = [
-      "食費",
-      "交通費",
-      "娯楽",
-      "衣服",
-      "医療費",
-      "光熱費",
-      "通信費",
-      "その他",
-    ];
+    // 予算と支出から動的にカテゴリを取得
+    const budgetCategories = currentMonthBudgets.map((b) => b.category);
+    const expenseCategories = currentMonthExpenses.map((e) => e.category);
+    const categories = Array.from(
+      new Set([...budgetCategories, ...expenseCategories])
+    ).sort();
 
     return categories
       .map((category) => {

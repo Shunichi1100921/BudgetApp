@@ -13,19 +13,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-// 支出カテゴリのリスト（支出フォームと同じ）
-const expenseCategories: ExpenseCategory[] = [
-  "食費",
-  "交通費",
-  "娯楽",
-  "衣服",
-  "医療費",
-  "光熱費",
-  "通信費",
-  "貯金",
-  "その他",
-];
-
 // ステップ1: 所持金入力のスキーマ
 const balanceSchema = z.object({
   name: z.preprocess(
@@ -59,8 +46,6 @@ const paymentMethods: PaymentMethod[] = [
   "その他",
 ];
 
-const SAVINGS_CATEGORY: ExpenseCategory = "貯金";
-
 export default function BudgetsPage() {
   const {
     paymentMethods: methods,
@@ -84,7 +69,7 @@ export default function BudgetsPage() {
   const [editingBalanceId, setEditingBalanceId] = useState<string | null>(null);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
   const [isAddingBudget, setIsAddingBudget] = useState(false);
-  const [newBudgetCategory, setNewBudgetCategory] = useState<ExpenseCategory | "">("");
+  const [newBudgetCategory, setNewBudgetCategory] = useState<string>("");
   const [newBudgetAmount, setNewBudgetAmount] = useState<number>(0);
   const [editingBudgetAmount, setEditingBudgetAmount] = useState<number>(0);
 
@@ -156,19 +141,14 @@ export default function BudgetsPage() {
   );
   const remainingForSavings = totalBalance - totalAllocated;
 
-  // 既に設定されているカテゴリを取得
+  // 既に設定されているカテゴリを取得（表示用）
   const allocatedCategories = new Set(
     filteredBudgets.map((b) => b.category)
   );
 
-  // 追加可能なカテゴリリスト（貯金を含む全てのカテゴリから既に設定済みのものを除外）
-  const availableCategories = expenseCategories.filter(
-    (category) => !allocatedCategories.has(category)
-  );
-
   // 予算の追加
   const handleAddBudget = () => {
-    if (!newBudgetCategory || newBudgetAmount <= 0) {
+    if (!newBudgetCategory.trim() || newBudgetAmount <= 0) {
       alert("カテゴリと金額を入力してください");
       return;
     }
@@ -179,7 +159,7 @@ export default function BudgetsPage() {
     }
 
     addBudget({
-      category: newBudgetCategory as ExpenseCategory,
+      category: newBudgetCategory.trim(),
       amount: newBudgetAmount,
       month: selectedMonth,
     });
@@ -618,20 +598,13 @@ export default function BudgetsPage() {
                   {isAddingBudget ? (
                     <div className="p-3 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
                       <div className="space-y-2">
-                        <Select
+                        <Input
                           label="カテゴリ"
                           value={newBudgetCategory}
-                          onChange={(e) =>
-                            setNewBudgetCategory(e.target.value as ExpenseCategory)
-                          }
-                        >
-                          <option value="">選択してください</option>
-                          {availableCategories.map((category) => (
-                            <option key={category} value={category}>
-                              {category}
-                            </option>
-                          ))}
-                        </Select>
+                          onChange={(e) => setNewBudgetCategory(e.target.value)}
+                          placeholder="例：食費、交通費など"
+                          className="text-sm"
+                        />
                         <Input
                           type="number"
                           label="予算額"
@@ -664,7 +637,6 @@ export default function BudgetsPage() {
                     <button
                       onClick={() => setIsAddingBudget(true)}
                       className="p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors text-gray-500 hover:text-blue-600 min-h-[120px] flex items-center justify-center"
-                      disabled={availableCategories.length === 0}
                     >
                       <div className="text-center">
                         <div className="text-2xl font-bold mb-1">+</div>

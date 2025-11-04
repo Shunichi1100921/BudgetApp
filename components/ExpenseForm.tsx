@@ -47,15 +47,17 @@ const paymentMethods: PaymentMethod[] = [
 ];
 
 export default function ExpenseForm() {
-  const { addExpense, budgets } = useBudgetStore();
+  const { addExpense, budgets, expenses } = useBudgetStore();
   
-  // Get unique categories from budgets
+  // Get unique categories from budgets and expenses
   const categories = useMemo(() => {
+    const budgetCategories = budgets.map((budget) => budget.category);
+    const expenseCategories = expenses.map((expense) => expense.category);
     const uniqueCategories = Array.from(
-      new Set(budgets.map((budget) => budget.category))
+      new Set([...budgetCategories, ...expenseCategories])
     );
     return uniqueCategories.sort();
-  }, [budgets]);
+  }, [budgets, expenses]);
   
   const {
     register,
@@ -114,24 +116,17 @@ export default function ExpenseForm() {
             label="カテゴリ"
             {...register("category")}
             error={errors.category?.message}
-            disabled={categories.length === 0}
           >
-            <option value="">
-              {categories.length === 0
-                ? "予算を先に作成してください"
-                : "選択してください"}
-            </option>
+            <option value="">選択してください</option>
             {categories.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>
             ))}
           </Select>
-          {categories.length === 0 && (
-            <p className="text-sm text-amber-600">
-              カテゴリを選択するには、まず予算管理ページで予算を作成してください。
-            </p>
-          )}
+          <p className="text-xs text-gray-500">
+            既存のカテゴリから選択するか、予算管理ページで新しいカテゴリを追加できます。
+          </p>
 
           <Select
             label="支払い方法"

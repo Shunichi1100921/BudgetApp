@@ -1,14 +1,5 @@
-// 支出カテゴリ
-export type ExpenseCategory =
-  | "食費"
-  | "交通費"
-  | "娯楽"
-  | "衣服"
-  | "医療費"
-  | "光熱費"
-  | "通信費"
-  | "貯金"
-  | "その他";
+// 支出カテゴリ（自由記述可能）
+export type ExpenseCategory = string;
 
 // 予算カテゴリ設定
 export interface BudgetCategory {

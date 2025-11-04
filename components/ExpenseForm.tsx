@@ -45,6 +45,7 @@ const categories: ExpenseCategory[] = [
   "医療費",
   "光熱費",
   "通信費",
+  "貯金",
   "その他",
 ];
 
@@ -70,7 +71,7 @@ export default function ExpenseForm() {
       category: "",
       paymentMethod: "",
       description: "",
-      amount: "",
+      amount: undefined,
     },
     mode: "onSubmit",
   });

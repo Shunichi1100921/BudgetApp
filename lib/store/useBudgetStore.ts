@@ -1,9 +1,10 @@
 import { create } from "zustand";
-import { Expense, Budget, PaymentMethodConfig } from "../types";
+import { Expense, Budget, PaymentMethodConfig, BudgetCategory } from "../types";
 import {
   expenseStorage,
   budgetStorage,
   paymentMethodStorage,
+  budgetCategoryStorage,
 } from "../storage";
 import { format } from "date-fns";
 
@@ -11,6 +12,7 @@ interface BudgetState {
   expenses: Expense[];
   budgets: Budget[];
   paymentMethods: PaymentMethodConfig[];
+  budgetCategories: BudgetCategory[];
   
   // 初期化
   initialize: () => void;
@@ -30,17 +32,24 @@ interface BudgetState {
   updatePaymentMethod: (id: string, updates: Partial<PaymentMethodConfig>) => void;
   deletePaymentMethod: (id: string) => void;
   
+  // 予算カテゴリ関連
+  addBudgetCategory: (category: Omit<BudgetCategory, "id" | "createdAt">) => void;
+  updateBudgetCategory: (id: string, updates: Partial<BudgetCategory>) => void;
+  deleteBudgetCategory: (id: string) => void;
+  
   // 計算・取得メソッド
   getExpensesByMonth: (month: string) => Expense[];
   getBudgetsByMonth: (month: string) => Budget[];
   getCategoryTotalByMonth: (category: string, month: string) => number;
   isBudgetExceeded: (category: string, month: string) => boolean;
+  getTotalBalance: () => number; // 全支払い方法の合計残高
 }
 
 export const useBudgetStore = create<BudgetState>((set, get) => ({
   expenses: [],
   budgets: [],
   paymentMethods: [],
+  budgetCategories: [],
 
   initialize: () => {
     if (typeof window === "undefined") return;
@@ -48,6 +57,7 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
       expenses: expenseStorage.getAll(),
       budgets: budgetStorage.getAll(),
       paymentMethods: paymentMethodStorage.getAll(),
+      budgetCategories: budgetCategoryStorage.getAll(),
     });
   },
 
@@ -134,6 +144,34 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     }));
   },
 
+  addBudgetCategory: (categoryData) => {
+    const newCategory: BudgetCategory = {
+      ...categoryData,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+    };
+    budgetCategoryStorage.add(newCategory);
+    set((state) => ({
+      budgetCategories: [...state.budgetCategories, newCategory],
+    }));
+  },
+
+  updateBudgetCategory: (id, updates) => {
+    budgetCategoryStorage.update(id, updates);
+    set((state) => ({
+      budgetCategories: state.budgetCategories.map((c) =>
+        c.id === id ? { ...c, ...updates } : c
+      ),
+    }));
+  },
+
+  deleteBudgetCategory: (id) => {
+    budgetCategoryStorage.delete(id);
+    set((state) => ({
+      budgetCategories: state.budgetCategories.filter((c) => c.id !== id),
+    }));
+  },
+
   getExpensesByMonth: (month) => {
     return get().expenses.filter((e) => e.date.startsWith(month));
   },
@@ -156,6 +194,10 @@ export const useBudgetStore = create<BudgetState>((set, get) => ({
     if (!budget) return false;
     const total = get().getCategoryTotalByMonth(category, month);
     return total > budget.amount;
+  },
+
+  getTotalBalance: () => {
+    return get().paymentMethods.reduce((sum, method) => sum + method.balance, 0);
   },
 }));
 

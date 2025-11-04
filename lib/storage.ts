@@ -1,9 +1,10 @@
-import { Expense, Budget, PaymentMethodConfig } from "./types";
+import { Expense, Budget, PaymentMethodConfig, BudgetCategory } from "./types";
 
 const STORAGE_KEYS = {
   expenses: "budget-app-expenses",
   budgets: "budget-app-budgets",
   paymentMethods: "budget-app-payment-methods",
+  budgetCategories: "budget-app-budget-categories",
 } as const;
 
 // 支出の保存・取得
@@ -93,6 +94,36 @@ export const paymentMethodStorage = {
   delete: (id: string): void => {
     const paymentMethods = paymentMethodStorage.getAll();
     paymentMethodStorage.save(paymentMethods.filter((p) => p.id !== id));
+  },
+};
+
+// 予算カテゴリの保存・取得
+export const budgetCategoryStorage = {
+  getAll: (): BudgetCategory[] => {
+    if (typeof window === "undefined" || !localStorage) return [];
+    const data = localStorage.getItem(STORAGE_KEYS.budgetCategories);
+    return data ? JSON.parse(data) : [];
+  },
+  save: (categories: BudgetCategory[]): void => {
+    if (typeof window === "undefined" || !localStorage) return;
+    localStorage.setItem(STORAGE_KEYS.budgetCategories, JSON.stringify(categories));
+  },
+  add: (category: BudgetCategory): void => {
+    const categories = budgetCategoryStorage.getAll();
+    categories.push(category);
+    budgetCategoryStorage.save(categories);
+  },
+  update: (id: string, updates: Partial<BudgetCategory>): void => {
+    const categories = budgetCategoryStorage.getAll();
+    const index = categories.findIndex((c) => c.id === id);
+    if (index !== -1) {
+      categories[index] = { ...categories[index], ...updates };
+      budgetCategoryStorage.save(categories);
+    }
+  },
+  delete: (id: string): void => {
+    const categories = budgetCategoryStorage.getAll();
+    budgetCategoryStorage.save(categories.filter((c) => c.id !== id));
   },
 };
 

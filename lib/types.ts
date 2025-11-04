@@ -7,7 +7,15 @@ export type ExpenseCategory =
   | "医療費"
   | "光熱費"
   | "通信費"
+  | "貯金"
   | "その他";
+
+// 予算カテゴリ設定
+export interface BudgetCategory {
+  id: string;
+  name: string;
+  createdAt: string;
+}
 
 // 支払い方法
 export type PaymentMethod = "現金" | "クレジットカード" | "デビットカード" | "PayPay" | "その他";

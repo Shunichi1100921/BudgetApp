@@ -54,6 +54,7 @@ export default function ExpensesPage() {
     "医療費",
     "光熱費",
     "通信費",
+    "貯金",
     "その他",
   ];
 

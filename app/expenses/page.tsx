@@ -12,7 +12,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { format } from "date-fns";
 
 export default function ExpensesPage() {
-  const { expenses, budgets, initialize, deleteExpense } = useBudgetStore();
+  const { expenses, budgets, initialize, deleteExpense, updateExpense } = useBudgetStore();
   const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
   const [filterCategory, setFilterCategory] = useState<string>("");
   const [filterPaymentMethod, setFilterPaymentMethod] = useState<string>("");
@@ -20,6 +20,7 @@ export default function ExpensesPage() {
     format(new Date(), "yyyy-MM")
   );
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [editingValues, setEditingValues] = useState<Partial<Expense>>({});
 
   useEffect(() => {
     initialize();
@@ -29,6 +30,7 @@ export default function ExpensesPage() {
   useEffect(() => {
     if (editingExpenseId && !expenses.find((e) => e.id === editingExpenseId)) {
       setEditingExpenseId(null);
+      setEditingValues({});
     }
   }, [editingExpenseId, expenses]);
 
@@ -78,16 +80,38 @@ export default function ExpensesPage() {
 
   const totalAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
-  const editingExpense = editingExpenseId
-    ? expenses.find((e) => e.id === editingExpenseId)
-    : null;
-
   const handleEdit = (expense: Expense) => {
     setEditingExpenseId(expense.id);
+    setEditingValues({
+      amount: expense.amount,
+      category: expense.category,
+      paymentMethod: expense.paymentMethod,
+      description: expense.description,
+      date: expense.date,
+    });
   };
 
   const handleCancelEdit = () => {
     setEditingExpenseId(null);
+    setEditingValues({});
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingExpenseId) return;
+    
+    const expense = expenses.find((e) => e.id === editingExpenseId);
+    if (!expense) return;
+
+    updateExpense(editingExpenseId, {
+      amount: editingValues.amount ?? expense.amount,
+      category: (editingValues.category ?? expense.category) as ExpenseCategory,
+      paymentMethod: (editingValues.paymentMethod ?? expense.paymentMethod) as PaymentMethod,
+      description: editingValues.description ?? expense.description,
+      date: editingValues.date ?? expense.date,
+    });
+    
+    alert("支出を更新しました");
+    handleCancelEdit();
   };
 
   const handleDelete = (id: string) => {
@@ -108,10 +132,7 @@ export default function ExpensesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-1">
-          <ExpenseForm
-            editingExpense={editingExpense}
-            onCancel={handleCancelEdit}
-          />
+          <ExpenseForm />
         </div>
 
         <div className="lg:col-span-2">
@@ -169,48 +190,148 @@ export default function ExpensesPage() {
                     支出がありません
                   </p>
                 ) : (
-                  filteredExpenses.map((expense) => (
-                    <div
-                      key={expense.id}
-                      className="flex justify-between items-start p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">
-                          {expense.description || "（説明なし）"}
-                        </p>
-                        <div className="flex gap-2 mt-1 text-sm text-gray-600">
-                          <span>{formatDate(expense.date)}</span>
-                          <span>·</span>
-                          <span>{expense.category}</span>
-                          <span>·</span>
-                          <span>{expense.paymentMethod}</span>
-                        </div>
+                  filteredExpenses.map((expense) => {
+                    const isEditing = editingExpenseId === expense.id;
+                    const displayValues = isEditing ? editingValues : expense;
+                    
+                    return (
+                      <div
+                        key={expense.id}
+                        className={`p-4 border rounded-lg ${
+                          isEditing
+                            ? "border-blue-400 bg-blue-50 shadow-md"
+                            : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <Input
+                                label="金額"
+                                type="number"
+                                step="1"
+                                value={displayValues.amount ?? ""}
+                                onChange={(e) =>
+                                  setEditingValues({
+                                    ...editingValues,
+                                    amount: Number(e.target.value),
+                                  })
+                                }
+                              />
+                              <Input
+                                label="日付"
+                                type="date"
+                                value={displayValues.date ?? ""}
+                                onChange={(e) =>
+                                  setEditingValues({
+                                    ...editingValues,
+                                    date: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <Select
+                                label="カテゴリ"
+                                value={displayValues.category ?? ""}
+                                onChange={(e) =>
+                                  setEditingValues({
+                                    ...editingValues,
+                                    category: e.target.value as ExpenseCategory,
+                                  })
+                                }
+                              >
+                                <option value="">選択してください</option>
+                                {categories.map((cat) => (
+                                  <option key={cat} value={cat}>
+                                    {cat}
+                                  </option>
+                                ))}
+                              </Select>
+                              <Select
+                                label="支払い方法"
+                                value={displayValues.paymentMethod ?? ""}
+                                onChange={(e) =>
+                                  setEditingValues({
+                                    ...editingValues,
+                                    paymentMethod: e.target.value as PaymentMethod,
+                                  })
+                                }
+                              >
+                                <option value="">選択してください</option>
+                                {paymentMethods.map((method) => (
+                                  <option key={method} value={method}>
+                                    {method}
+                                  </option>
+                                ))}
+                              </Select>
+                            </div>
+                            <Input
+                              label="説明（任意）"
+                              value={displayValues.description ?? ""}
+                              onChange={(e) =>
+                                setEditingValues({
+                                  ...editingValues,
+                                  description: e.target.value,
+                                })
+                              }
+                            />
+                            <div className="flex gap-2 pt-2">
+                              <Button
+                                onClick={handleSaveEdit}
+                                className="flex-1"
+                              >
+                                保存
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                onClick={handleCancelEdit}
+                                className="flex-1"
+                              >
+                                キャンセル
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">
+                                {expense.description || "（説明なし）"}
+                              </p>
+                              <div className="flex gap-2 mt-1 text-sm text-gray-600">
+                                <span>{formatDate(expense.date)}</span>
+                                <span>·</span>
+                                <span>{expense.category}</span>
+                                <span>·</span>
+                                <span>{expense.paymentMethod}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold text-gray-900">
+                                {formatCurrency(expense.amount)}
+                              </span>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="secondary"
+                                  onClick={() => handleEdit(expense)}
+                                  className="text-sm"
+                                >
+                                  編集
+                                </Button>
+                                <Button
+                                  variant="danger"
+                                  onClick={() => handleDelete(expense.id)}
+                                  className="text-sm"
+                                >
+                                  削除
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold text-gray-900">
-                          {formatCurrency(expense.amount)}
-                        </span>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="secondary"
-                            onClick={() => handleEdit(expense)}
-                            className="text-sm"
-                            disabled={editingExpenseId === expense.id}
-                          >
-                            編集
-                          </Button>
-                          <Button
-                            variant="danger"
-                            onClick={() => handleDelete(expense.id)}
-                            className="text-sm"
-                            disabled={editingExpenseId === expense.id}
-                          >
-                            削除
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>

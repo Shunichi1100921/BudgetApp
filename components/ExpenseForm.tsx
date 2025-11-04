@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useBudgetStore } from "@/lib/store/useBudgetStore";
-import { ExpenseCategory, PaymentMethod, Expense } from "@/lib/types";
+import { ExpenseCategory, PaymentMethod } from "@/lib/types";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
@@ -46,13 +46,8 @@ const paymentMethods: PaymentMethod[] = [
   "その他",
 ];
 
-interface ExpenseFormProps {
-  editingExpense?: Expense | null;
-  onCancel?: () => void;
-}
-
-export default function ExpenseForm({ editingExpense, onCancel }: ExpenseFormProps) {
-  const { addExpense, updateExpense, budgets } = useBudgetStore();
+export default function ExpenseForm() {
+  const { addExpense, budgets } = useBudgetStore();
   
   // Get unique categories from budgets
   const categories = useMemo(() => {
@@ -67,7 +62,6 @@ export default function ExpenseForm({ editingExpense, onCancel }: ExpenseFormPro
     handleSubmit,
     formState: { errors },
     reset,
-    setValue,
   } = useForm<ExpenseFormData>({
     resolver: zodResolver(expenseSchema) as any,
     defaultValues: {
@@ -80,55 +74,22 @@ export default function ExpenseForm({ editingExpense, onCancel }: ExpenseFormPro
     mode: "onSubmit",
   });
 
-  // Populate form when editing
-  useEffect(() => {
-    if (editingExpense) {
-      setValue("amount", editingExpense.amount);
-      setValue("category", editingExpense.category);
-      setValue("paymentMethod", editingExpense.paymentMethod);
-      setValue("description", editingExpense.description || "");
-      setValue("date", editingExpense.date);
-    } else {
-      reset({
-        date: format(new Date(), "yyyy-MM-dd"),
-        category: "",
-        paymentMethod: "",
-        description: "",
-        amount: undefined,
-      });
-    }
-  }, [editingExpense, setValue, reset]);
-
   const onSubmit = (data: ExpenseFormData) => {
-    if (editingExpense) {
-      updateExpense(editingExpense.id, {
-        amount: data.amount,
-        category: data.category as ExpenseCategory,
-        paymentMethod: data.paymentMethod as PaymentMethod,
-        description: data.description || "",
-        date: data.date,
-      });
-      alert("支出を更新しました");
-      if (onCancel) {
-        onCancel();
-      }
-    } else {
-      addExpense({
-        amount: data.amount,
-        category: data.category as ExpenseCategory,
-        paymentMethod: data.paymentMethod as PaymentMethod,
-        description: data.description || "",
-        date: data.date,
-      });
-      alert("支出を追加しました");
-    }
+    addExpense({
+      amount: data.amount,
+      category: data.category as ExpenseCategory,
+      paymentMethod: data.paymentMethod as PaymentMethod,
+      description: data.description || "",
+      date: data.date,
+    });
     reset();
+    alert("支出を追加しました");
   };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{editingExpense ? "支出を編集" : "支出を追加"}</CardTitle>
+        <CardTitle>支出を追加</CardTitle>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -191,21 +152,9 @@ export default function ExpenseForm({ editingExpense, onCancel }: ExpenseFormPro
             error={errors.description?.message}
           />
 
-          <div className="flex gap-2">
-            <Button type="submit" className="flex-1">
-              {editingExpense ? "更新" : "追加"}
-            </Button>
-            {editingExpense && onCancel && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onCancel}
-                className="flex-1"
-              >
-                キャンセル
-              </Button>
-            )}
-          </div>
+          <Button type="submit" className="w-full">
+            追加
+          </Button>
         </form>
       </CardContent>
     </Card>

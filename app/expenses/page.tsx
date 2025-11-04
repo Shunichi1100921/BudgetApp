@@ -19,10 +19,18 @@ export default function ExpensesPage() {
   const [filterMonth, setFilterMonth] = useState<string>(
     format(new Date(), "yyyy-MM")
   );
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // Clear editing state if the expense being edited no longer exists
+  useEffect(() => {
+    if (editingExpenseId && !expenses.find((e) => e.id === editingExpenseId)) {
+      setEditingExpenseId(null);
+    }
+  }, [editingExpenseId, expenses]);
 
   useEffect(() => {
     let filtered = expenses;
@@ -70,9 +78,24 @@ export default function ExpensesPage() {
 
   const totalAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
 
+  const editingExpense = editingExpenseId
+    ? expenses.find((e) => e.id === editingExpenseId)
+    : null;
+
+  const handleEdit = (expense: Expense) => {
+    setEditingExpenseId(expense.id);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingExpenseId(null);
+  };
+
   const handleDelete = (id: string) => {
     if (confirm("この支出を削除しますか？")) {
       deleteExpense(id);
+      if (editingExpenseId === id) {
+        setEditingExpenseId(null);
+      }
     }
   };
 
@@ -85,7 +108,10 @@ export default function ExpensesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-1">
-          <ExpenseForm />
+          <ExpenseForm
+            editingExpense={editingExpense}
+            onCancel={handleCancelEdit}
+          />
         </div>
 
         <div className="lg:col-span-2">
@@ -164,13 +190,24 @@ export default function ExpensesPage() {
                         <span className="font-semibold text-gray-900">
                           {formatCurrency(expense.amount)}
                         </span>
-                        <Button
-                          variant="danger"
-                          onClick={() => handleDelete(expense.id)}
-                          className="text-sm"
-                        >
-                          削除
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="secondary"
+                            onClick={() => handleEdit(expense)}
+                            className="text-sm"
+                            disabled={editingExpenseId === expense.id}
+                          >
+                            編集
+                          </Button>
+                          <Button
+                            variant="danger"
+                            onClick={() => handleDelete(expense.id)}
+                            className="text-sm"
+                            disabled={editingExpenseId === expense.id}
+                          >
+                            削除
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))
